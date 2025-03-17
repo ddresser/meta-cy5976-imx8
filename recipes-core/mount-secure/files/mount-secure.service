@@ -1,0 +1,15 @@
+[Unit]
+Description=Mount Encrypted Secure Filesystem
+After=network.target local-fs.target
+Requires=systemd-udevd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/mount-secure.sh
+ExecStop=/bin/umount /mnt/secure
+ExecStopPost=/sbin/cryptsetup close securefs
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target

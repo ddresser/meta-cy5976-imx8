@@ -17,6 +17,6 @@ part u-boot --source rawcopy --sourceparams="file=imx-boot" --ondisk mmcblk --no
 part /boot --source bootimg-partition --ondisk mmcblk --fstype=vfat --label boot --active --align 8192 --size 64
 part / --source rootfs --ondisk mmcblk --fstype=ext4 --label root --align 8192
 # LUKS partition - same attributes as root partition
-part /encrypted --size 512  --ondisk mmcblk --label encrypted --align 8192 --no-table
+part /encrypted --size 576  --ondisk mmcblk --label encrypted --align 8192
 
 bootloader --ptable msdos
