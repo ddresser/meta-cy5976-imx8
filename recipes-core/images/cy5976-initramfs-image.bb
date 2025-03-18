@@ -3,7 +3,7 @@ LICENSE = "MIT"
 
 require recipes-core/images/core-image-minimal-initramfs.bb
 
-PACKAGE_INSTALL += " cryptsetup keyctl-caam e2fsprogs-mke2fs"
+PACKAGE_INSTALL += " cryptsetup keyctl-caam e2fsprogs-mke2fs keyutils encrypt-rootfs"
 
 INITRAMFS_SCRIPTS += "\
 		      initramfs-module-e2fs \
@@ -18,16 +18,8 @@ create_custom_init() {
 #!/bin/sh
 echo "Hello, World from Initramfs!"
 
-# mount /proc filesystem
-echo "Mounting /proc filesystem"
-/bin/mount -t proc proc /proc
-
-# load caam modules
-echo "Loading caam modules..."
-/sbin/modprobe caam caamkeyblob_desc caam_jr caamhash_desc caamalg_desc
-
 # drop to a shell
-exec /bin/sh
+exec /bin/sh -l
 EOF
     chmod +x ${IMAGE_ROOTFS}/init
 }
