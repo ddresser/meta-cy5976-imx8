@@ -19,7 +19,15 @@ create_custom_init() {
 echo "Hello, World from Initramfs!"
 
 # drop to a shell
-exec /bin/sh -l
+
+# set up encrypted rootfs
+/usr/sbin/encrypt-rootfs.sh
+
+sync
+
+
+exec /usr/sbin/switch_root /mnt/secure /sbin/init
+
 EOF
     chmod +x ${IMAGE_ROOTFS}/init
 }

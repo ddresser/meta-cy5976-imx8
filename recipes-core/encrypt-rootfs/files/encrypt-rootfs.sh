@@ -7,9 +7,10 @@ OLD_MOUNT_POINT="/mnt/old"
 BOOT_PARTITION="/dev/mmcblk0p1"
 OLD_PARTITION="/dev/mmcblk0p2"
 BOOT_MOUNT="/mnt/boot"
-ROOT_PARTITION="/dev/mmcblk0p2"
 KEY_BLOB_PATH="$BOOT_MOUNT/secure_key.blob"
 KEY_TMP="/tmp/secure_key"
+ALREADY_ENCRYPTED=0
+
 
 # Ensure necessary mount points exist
 mkdir -p $OLD_MOUNT_POINT $MOUNT_POINT $BOOT_MOUNT /proc /sys /dev
@@ -55,6 +56,7 @@ if [ ! -f "$KEY_BLOB_PATH" ]; then
     generate_caam_key
 else
     echo "CAAM key found, using existing key."
+    ALREADY_ENCRYPTED=1
 fi
 
 # Copy the key for use
@@ -66,7 +68,9 @@ umount $BOOT_MOUNT
 if ! /usr/sbin/cryptsetup isLuks $DEVICE; then
     echo "Setting up LUKS encryption on $DEVICE..."
     /usr/sbin/cryptsetup luksFormat -q --type luks2 --cipher aes-cbc-essiv:sha256 --key-size 256 \
-        --key-file $KEY_TMP $DEVICE
+			 --key-file $KEY_TMP $DEVICE
+else
+    ALREADY_ENCRYPTED=1
 fi
 
 # Open the encrypted partition
@@ -79,10 +83,13 @@ if [ ! -e "/dev/mapper/$MAPPER_NAME" ]; then
     exit 1
 fi
 
-# Format the encrypted partition if it's not already formatted
-if ! blkid /dev/mapper/$MAPPER_NAME >/dev/null 2>&1; then
-    echo "Creating ext4 filesystem on encrypted partition..."
-    /usr/sbin/mkfs.ext4 /dev/mapper/$MAPPER_NAME
+# Only format if the new partition is not yet encrypted
+if [ "$ALREADY_ENCRYPTED" -eq 0 ]; then
+    # Format the encrypted partition if it's not already formatted
+    if ! blkid /dev/mapper/$MAPPER_NAME >/dev/null 2>&1; then
+	echo "Creating ext4 filesystem on encrypted partition..."
+	/usr/sbin/mkfs.ext4 /dev/mapper/$MAPPER_NAME
+    fi
 fi
 
 # Mount the encrypted filesystem
@@ -92,36 +99,35 @@ mount -t ext4 /dev/mapper/$MAPPER_NAME $MOUNT_POINT || {
     exit 1
 }
 
-# Mount the unencrypted root filesystem
-echo "Mounting original root filesystem"
-mount -t ext4 $OLD_PARTITION $OLD_MOUNT_POINT
+# Only copy files if we created a new filesystem
+if [ "$ALREADY_ENCRYPTED" -eq 0 ]; then
+    # Mount the unencrypted root filesystem
+    echo "Mounting original root filesystem"
+    mount -t ext4 $OLD_PARTITION $OLD_MOUNT_POINT
 
-# Copy root filesystem to the encrypted partition
-echo "Copying root filesystem..."
-for i in $OLD_MOUNT_POINT/*; do
-    case "$(basename $i)" in
-        dev|sys|proc)
-            echo "Skipping $i"
-            continue
-            ;;
-        *)
-            echo "Copying $i to $MOUNT_POINT"
-            cp -a "$i" "$MOUNT_POINT/"
-            ;;
-    esac
-done
+    # Copy root filesystem to the encrypted partition
+    echo "Copying root filesystem..."
+    for i in "$OLD_MOUNT_POINT"/*; do
+	case "$(basename "$i")" in
+            dev|sys|proc)
+		echo "Skipping $i"
+		continue
+		;;
+            *)
+		echo "Copying $i to $MOUNT_POINT"
+		cp -a "$i" "$MOUNT_POINT/"
+		;;
+	esac
+    done
+fi
 
 # Make mount points for proc, sys, dev
-mkdir -p $MOUNT_POINT/proc
-mkdir -p $MOUNT_POINT/dev
-mkdir -p $MOUNT_POINT/sys
-
-sync
+mkdir -p "$MOUNT_POINT"/proc
+mkdir -p "$MOUNT_POINT"/dev
+mkdir -p "$MOUNT_POINT"/sys
 
 # Switch to new root
 echo "Switching to encrypted root filesystem..."
-mount --bind /proc $MOUNT_POINT/proc
-mount --bind /sys $MOUNT_POINT/sys
-mount --bind /dev $MOUNT_POINT/dev
-
-#exec /usr/sbin/switch_root $MOUNT_POINT /sbin/init
+mount --bind /proc "$MOUNT_POINT"/proc
+mount --bind /sys "$MOUNT_POINT"/sys
+mount --bind /dev "$MOUNT_POINT"/dev
