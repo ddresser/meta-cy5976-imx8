@@ -7,9 +7,10 @@ OLD_MOUNT_POINT="/mnt/old"
 BOOT_PARTITION="/dev/mmcblk0p1"
 OLD_PARTITION="/dev/mmcblk0p2"
 BOOT_MOUNT="/mnt/boot"
-KEY_BLOB_PATH="$BOOT_MOUNT/secure_key"
+KEY_BLOB_PATH="$BOOT_MOUNT/secure_key.blob"
 KEY_TMP="/tmp/secure_key"
 ALREADY_ENCRYPTED=0
+
 
 # Ensure necessary mount points exist
 mkdir -p $OLD_MOUNT_POINT $MOUNT_POINT $BOOT_MOUNT /proc /sys /dev
@@ -22,8 +23,8 @@ echo "Mounting /sys"
 echo "Mounting /dev"
 /usr/bin/mount -t devtmpfs devtmpfs /dev
 
-# Load CAAM kernel modules
-echo "Loading CAAM modules..."
+# load caam kernel modules
+echo "Loading caam modules..."
 /usr/sbin/modprobe caam
 /usr/sbin/modprobe caam_jr
 /usr/sbin/modprobe caamkeyblob_desc
@@ -44,7 +45,6 @@ generate_caam_key() {
         exit 1
     fi
 
-    echo "Copying key blob to persistent storage"
     cp /data/caam/generatedkey $KEY_BLOB_PATH
     sync
     echo "CAAM key stored in boot partition."
@@ -59,21 +59,23 @@ else
     ALREADY_ENCRYPTED=1
 fi
 
-# Add key to keychain
-echo "Adding key to kernel keychain..."
-cp "$KEY_BLOB_PATH" "$KEY_TMP"
-cat "$KEY_TMP" | keyctl padd logon lukskey: @u
+# Copy the key for use
+cp $KEY_BLOB_PATH $KEY_TMP
 sync
 umount $BOOT_MOUNT
 
-# Set up LUKS encryption
-echo "Setting up LUKS encryption on $DEVICE..."
-SECTOR_SIZE=512
-BLOCK_COUNT=$(/usr/sbin/blockdev --getsz "$DEVICE")
+# Check if the partition is already encrypted
+if ! /usr/sbin/cryptsetup isLuks $DEVICE; then
+    echo "Setting up LUKS encryption on $DEVICE..."
+    /usr/sbin/cryptsetup luksFormat -q --type luks2 --cipher aes-cbc-essiv:sha256 --key-size 256 \
+			 --key-file $KEY_TMP $DEVICE
+else
+    ALREADY_ENCRYPTED=1
+fi
 
-dmsetup -v create $MAPPER_NAME --table "0 $BLOCK_COUNT crypt capi:tk(cbc(aes))-plain :36:logon:lukskey: 0 $DEVICE 0 1 sector_size:$SECTOR_SIZE"
-# create /dev/mapper link if it didn't get created
-ln -s /dev/dm-0 /dev/mapper/$MAPPER_NAME || true
+# Open the encrypted partition
+echo "Unlocking encrypted partition..."
+/usr/sbin/cryptsetup open --type luks2 --key-file $KEY_TMP $DEVICE $MAPPER_NAME
 
 # Ensure encrypted device is available
 if [ ! -e "/dev/mapper/$MAPPER_NAME" ]; then
@@ -83,9 +85,10 @@ fi
 
 # Only format if the new partition is not yet encrypted
 if [ "$ALREADY_ENCRYPTED" -eq 0 ]; then
+    # Format the encrypted partition if it's not already formatted
     if ! blkid /dev/mapper/$MAPPER_NAME >/dev/null 2>&1; then
-        echo "Creating ext4 filesystem on encrypted partition..."
-        /usr/sbin/mkfs.ext4 /dev/mapper/$MAPPER_NAME
+	echo "Creating ext4 filesystem on encrypted partition..."
+	/usr/sbin/mkfs.ext4 /dev/mapper/$MAPPER_NAME
     fi
 fi
 
@@ -98,21 +101,23 @@ mount -t ext4 /dev/mapper/$MAPPER_NAME $MOUNT_POINT || {
 
 # Only copy files if we created a new filesystem
 if [ "$ALREADY_ENCRYPTED" -eq 0 ]; then
+    # Mount the unencrypted root filesystem
     echo "Mounting original root filesystem"
     mount -t ext4 $OLD_PARTITION $OLD_MOUNT_POINT
 
+    # Copy root filesystem to the encrypted partition
     echo "Copying root filesystem..."
     for i in "$OLD_MOUNT_POINT"/*; do
-        case "$(basename "$i")" in
+	case "$(basename "$i")" in
             dev|sys|proc)
-                echo "Skipping $i"
-                continue
-                ;;
+		echo "Skipping $i"
+		continue
+		;;
             *)
-                echo "Copying $i to $MOUNT_POINT"
-                cp -a "$i" "$MOUNT_POINT/"
-                ;;
-        esac
+		echo "Copying $i to $MOUNT_POINT"
+		cp -a "$i" "$MOUNT_POINT/"
+		;;
+	esac
     done
 fi
 

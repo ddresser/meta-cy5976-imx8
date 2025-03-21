@@ -3,7 +3,7 @@ LICENSE = "MIT"
 
 require recipes-core/images/core-image-minimal-initramfs.bb
 
-PACKAGE_INSTALL += " cryptsetup keyctl-caam e2fsprogs-mke2fs keyutils encrypt-rootfs util-linux"
+PACKAGE_INSTALL += " cryptsetup keyctl-caam e2fsprogs-mke2fs keyutils encrypt-rootfs"
 
 INITRAMFS_SCRIPTS += "\
 		      initramfs-module-e2fs \
@@ -22,6 +22,7 @@ echo "Hello, World from Initramfs!"
 /usr/sbin/encrypt-rootfs.sh
 
 sync
+
 
 exec /usr/sbin/switch_root /mnt/secure /sbin/init
 
