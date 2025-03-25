@@ -3,7 +3,8 @@ LICENSE = "CLOSED"
 #DEPENDS += "u-boot-mkimage-native"
 #inherit deploy
 
-SRC_URI += "file://boot.cmd"
+SRC_URI += " file://boot.cmd "
+SRC_URI += " file://imx8ulp_evk_defconfig.patch;patchdir=${S} "
 	    
 UBOOT_ENV = "boot"
 UBOOT_ENV_SUFFIX = "scr"

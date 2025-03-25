@@ -1,0 +1,11 @@
+diff --git a/configs/imx8ulp_evk_defconfig b/configs/imx8ulp_evk_defconfig
+index 55c7f03e773..e4e60e484f9 100644
+--- a/configs/imx8ulp_evk_defconfig
++++ b/configs/imx8ulp_evk_defconfig
+@@ -163,3 +163,6 @@ CONFIG_IMX_ELE_DEK_ENCAP=y
+ 
+ CONFIG_DM_RNG=y
+ CONFIG_KASLR=y
++
++CONFIG_AUTOBOOT_KEYED=y
++CONFIG_AUTOBOOT_STOP_STR="hello"
