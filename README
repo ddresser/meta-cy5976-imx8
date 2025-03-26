@@ -1,27 +1,30 @@
 This README file contains information on the contents of the cy5976-imx8 layer.
 
+I created this in a graduate school independent study.  The project was to investigate and learn
+about hardware security modules generally and then to select an arm board to implement a secure
+boot and encrypted root filesystem.  I chose the NXP i.MX8ULP EVK board.  These configurations
+are from that project and may help someone trying to implement secure boot or encrypted filesystem
+on that device.  This is a proof of concept as I learned the board and underlying technologies.
+
 Please see the corresponding sections below for details.
 
 Dependencies
 ============
 
-  URI: <first dependency>
-  branch: <branch name>
+This depends on the
+     meta-imx
+     meta-nxp-security-reference-design/meta-secure-boot
+layers
 
-  URI: <second dependency>
-  branch: <branch name>
+I used the basiec instructions found here to get started:
+https://www.nxp.com/docs/en/user-guide/IMX_YOCTO_PROJECT_USERS_GUIDE.pdf
 
-  .
-  .
-  .
+This describes how the necessary layers can be set up using the google repo tool.
 
 Patches
 =======
 
-Please submit any patches against the cy5976-imx8 layer to the xxxx mailing list (xxxx@zzzz.org)
-and cc: the maintainer:
-
-Maintainer: XXX YYYYYY <xxx.yyyyyy@zzzzz.com>
+Feel free to submit pull requests if you would like to improve this example.
 
 Table of Contents
 =================
@@ -38,4 +41,9 @@ Run 'bitbake-layers add-layer cy5976-imx8'
 II. Misc
 ========
 
---- replace with specific information about the cy5976-imx8 layer ---
+Things implemented in this layer
+  1. U-boot script and autoboot stop word
+  2. Initramfs configuration
+  3. Script to set up encrypted root filesystem using CAAM tagged keys
+  4. Kernel configurations to support CAAM and initramfs
+  5. Boot image partition layout
